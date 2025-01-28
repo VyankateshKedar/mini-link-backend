@@ -6,6 +6,7 @@ const clickSchema = new mongoose.Schema({
   userAgent: String,
   deviceType: String,
   browser: String,
+  os: String, // Added OS field
   clickedAt: {
     type: Date,
     default: Date.now,
