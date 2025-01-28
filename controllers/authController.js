@@ -2,6 +2,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+// Register a new user
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
@@ -31,6 +32,7 @@ exports.register = async (req, res, next) => {
   }
 };
 
+// Login a user
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -67,6 +69,25 @@ exports.login = async (req, res, next) => {
   }
 };
 
+// Get current user details
+exports.getMe = async (req, res, next) => {
+  try {
+    // Fetch the user by ID from the JWT token
+    const user = await User.findById(req.user.id).select("-password"); // Exclude password
+    if (!user) {
+      const error = new Error("User not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Return user details
+    res.json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update user profile
 exports.updateProfile = async (req, res, next) => {
   try {
     const { name, email } = req.body;
@@ -85,7 +106,7 @@ exports.updateProfile = async (req, res, next) => {
       throw error;
     }
 
-    // If email is updated, log out user (client-side will remove token)
+    // If email is updated, signal logout
     let emailUpdated = false;
     if (email && email !== user.email) {
       user.email = email;
@@ -105,10 +126,11 @@ exports.updateProfile = async (req, res, next) => {
   }
 };
 
+// Delete user account
 exports.deleteAccount = async (req, res, next) => {
   try {
-    // Delete user and all associated links
     const userId = req.user.id;
+
     const user = await User.findById(userId);
     if (!user) {
       const error = new Error("User not found");
@@ -116,9 +138,8 @@ exports.deleteAccount = async (req, res, next) => {
       throw error;
     }
 
+    // Delete user and associated links
     await user.remove();
-    // Also delete all links of this user
-    const Link = require("../models/Link");
     await Link.deleteMany({ userId });
 
     res.json({ success: true, message: "Account and associated links deleted" });
