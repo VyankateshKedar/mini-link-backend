@@ -135,3 +135,84 @@ exports.editLink = async (req, res, next) => {
     next(err);
   }
 };
+
+// controllers/linkController.js
+exports.trackClick = async (req, res, next) => {
+  try {
+    const { shortCode } = req.params;
+
+    const link = await Link.findOne({ shortCode });
+    if (!link) {
+      const error = new Error("Link not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Check if link is expired
+    if (link.expiration && link.expiration < new Date()) {
+      return res.status(410).json({ success: false, message: "Link expired" });
+    }
+
+    // Parse user agent
+    const { deviceType, browser, os } = parseUserAgent(req.headers["user-agent"] || "");
+
+    // Record click data
+    link.clicks.push({
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+      deviceType,
+      browser,
+      os, // Store OS information
+    });
+    await link.save();
+
+    // Redirect to destination URL
+    return res.redirect(link.destinationUrl);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update getLinkAnalytics to include OS summary
+exports.getLinkAnalytics = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const link = await Link.findById(id);
+    if (!link) {
+      const error = new Error("Link not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (link.userId.toString() !== req.user.id) {
+      const error = new Error("Unauthorized access to this link");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    // Aggregated analytics
+    const totalClicks = link.clicks.length;
+
+    // Summaries
+    const deviceSummary = {};
+    const browserSummary = {};
+    const osSummary = {};
+
+    link.clicks.forEach((click) => {
+      deviceSummary[click.deviceType] = (deviceSummary[click.deviceType] || 0) + 1;
+      browserSummary[click.browser] = (browserSummary[click.browser] || 0) + 1;
+      osSummary[click.os] = (osSummary[click.os] || 0) + 1;
+    });
+
+    res.json({
+      success: true,
+      totalClicks,
+      deviceSummary,
+      browserSummary,
+      osSummary, // Include OS summary
+      clicks: link.clicks,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
