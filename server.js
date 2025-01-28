@@ -3,7 +3,7 @@ const app = express();
 const mongoose = require("mongoose");
 const authRoutes = require("./routes/authRoutes");
 const linkRoutes = require("./routes/links");
-const redirectRoutes = require("./routes/redirect");
+const redirectRoutes = require("./routes/redirectRoutes");
 const errorMiddleware = require("./middlewares/errorMiddleware");
 const dotenv = require("dotenv");
 
