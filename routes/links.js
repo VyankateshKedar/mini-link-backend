@@ -10,7 +10,8 @@ router.use(authenticateToken);
 // **New Route for Dashboard Statistics**
 router.get("/dashboard/stats", linkController.getDashboardStats);
 
-router.get("/analytics", linkController.getAllClicks); // **New Analytics Route**
+// **New Analytics Route**
+router.get("/analytics", linkController.getAllClicks);
 
 // POST route to create a new link
 router.post("/", linkController.createLink);
@@ -29,8 +30,5 @@ router.put("/:id", linkController.editLink);
 
 // DELETE route to delete a link
 router.delete("/:id", linkController.deleteLink);
-
-
-
 
 module.exports = router;
