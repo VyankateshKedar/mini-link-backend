@@ -15,7 +15,7 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: "http://localhost:3000", // Adjust to your frontend's URL
+  origin: "mini-link-frontend.vercel.app", // Adjust to your frontend's URL
   credentials: true,
 }));
 
