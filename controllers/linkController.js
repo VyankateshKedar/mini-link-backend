@@ -1,4 +1,5 @@
 // controllers/linkController.js
+
 const { nanoid } = require("nanoid");
 const Link = require("../models/Link");
 const parseUserAgent = require("../utils/parseUserAgent");
@@ -60,6 +61,65 @@ exports.createLink = async (req, res, next) => {
       message: "Link created successfully", 
       link: newLink 
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get all links with pagination and search
+exports.getLinks = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10, search = "" } = req.query;
+    const pageNumber = parseInt(page, 10);
+    const limitNumber = parseInt(limit, 10);
+
+    const query = {
+      userId: req.user.id,
+      $or: [
+        { destinationUrl: { $regex: search, $options: "i" } },
+        { shortUrl: { $regex: search, $options: "i" } },
+        { remarks: { $regex: search, $options: "i" } },
+      ],
+    };
+
+    const totalLinks = await Link.countDocuments(query);
+    const links = await Link.find(query)
+      .skip((pageNumber - 1) * limitNumber)
+      .limit(limitNumber)
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      totalLinks,
+      currentPage: pageNumber,
+      totalPages: Math.ceil(totalLinks / limitNumber),
+      links,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get link details by ID
+exports.getLinkDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const link = await Link.findById(id);
+
+    if (!link) {
+      const error = new Error("Link not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Check ownership
+    if (link.userId.toString() !== req.user.id) {
+      const error = new Error("Unauthorized access to this link");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    res.json({ success: true, link });
   } catch (err) {
     next(err);
   }
@@ -136,7 +196,32 @@ exports.editLink = async (req, res, next) => {
   }
 };
 
-// controllers/linkController.js
+// Delete a link by ID
+exports.deleteLink = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const link = await Link.findById(id);
+    if (!link) {
+      const error = new Error("Link not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Check ownership
+    if (link.userId.toString() !== req.user.id) {
+      const error = new Error("Unauthorized access to this link");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    await link.remove();
+    res.json({ success: true, message: "Link deleted successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Track a click and redirect
 exports.trackClick = async (req, res, next) => {
   try {
     const { shortCode } = req.params;
@@ -173,7 +258,7 @@ exports.trackClick = async (req, res, next) => {
   }
 };
 
-// Update getLinkAnalytics to include OS summary
+// Get analytics for a specific link
 exports.getLinkAnalytics = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -217,8 +302,73 @@ exports.getLinkAnalytics = async (req, res, next) => {
   }
 };
 
+// Get dashboard statistics
+exports.getDashboardStats = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
 
-// Get all clicks across all user links with pagination
+    // Fetch all links for the user and populate clicks
+    const links = await Link.find({ userId }).select("clicks");
+
+    // Aggregate all clicks across all links
+    const allClicks = links.reduce((acc, link) => {
+      if (link.clicks && link.clicks.length > 0) {
+        acc.push(...link.clicks);
+      }
+      return acc;
+    }, []);
+
+    // Total Clicks
+    const totalClicks = allClicks.length;
+
+    // Date-wise Clicks
+    const dateWiseClicks = {};
+    allClicks.forEach((click) => {
+      const date = new Date(click.clickedAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      if (dateWiseClicks[date]) {
+        dateWiseClicks[date]++;
+      } else {
+        dateWiseClicks[date] = 1;
+      }
+    });
+
+    // Convert dateWiseClicks to an array and sort by date descending
+    const sortedDateWiseClicks = Object.keys(dateWiseClicks)
+      .map((date) => ({ date, count: dateWiseClicks[date] }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Device-wise Clicks
+    const deviceWiseClicks = {
+      Mobile: 0,
+      Desktop: 0,
+      Tablet: 0,
+      Other: 0,
+    };
+    allClicks.forEach((click) => {
+      if (click.deviceType === "Mobile") deviceWiseClicks.Mobile++;
+      else if (click.deviceType === "Desktop") deviceWiseClicks.Desktop++;
+      else if (click.deviceType === "Tablet") deviceWiseClicks.Tablet++;
+      else deviceWiseClicks.Other++;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalClicks,
+        dateWiseClicks: sortedDateWiseClicks,
+        deviceWiseClicks,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get all clicks across user links with pagination
 exports.getAllClicks = async (req, res, next) => {
   try {
     const userId = req.user.id;
