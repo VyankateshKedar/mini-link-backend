@@ -216,3 +216,46 @@ exports.getLinkAnalytics = async (req, res, next) => {
     next(err);
   }
 };
+
+
+// Get all clicks across all user links with pagination
+exports.getAllClicks = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20 } = req.query;
+
+    // Fetch all links for the user
+    const links = await Link.find({ userId }).select("shortUrl destinationUrl clicks");
+
+    // Aggregate click data
+    let allClicks = links.flatMap(link => {
+      return link.clicks.map(click => ({
+        clickedAt: click.clickedAt,
+        destinationUrl: link.destinationUrl,
+        shortUrl: link.shortUrl,
+        ip: click.ip,
+        deviceType: click.deviceType,
+        browser: click.browser,
+        os: click.os, // Include OS if implemented
+      }));
+    });
+
+    // Sort clicks by timestamp descending
+    allClicks.sort((a, b) => new Date(b.clickedAt) - new Date(a.clickedAt));
+
+    // Implement pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+    const paginatedClicks = allClicks.slice(startIndex, endIndex);
+
+    res.json({
+      success: true,
+      data: paginatedClicks,
+      currentPage: parseInt(page, 10),
+      totalPages: Math.ceil(allClicks.length / limit),
+      totalClicks: allClicks.length,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
