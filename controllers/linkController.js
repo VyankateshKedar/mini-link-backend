@@ -201,6 +201,7 @@ exports.deleteLink = async (req, res, next) => {
   try {
     const { id } = req.params;
     const link = await Link.findById(id);
+
     if (!link) {
       const error = new Error("Link not found");
       error.statusCode = 404;
@@ -214,12 +215,15 @@ exports.deleteLink = async (req, res, next) => {
       throw error;
     }
 
-    await link.remove();
+    // Use the newer deleteOne() method on the retrieved document
+    await link.deleteOne();
+
     res.json({ success: true, message: "Link deleted successfully" });
   } catch (err) {
     next(err);
   }
 };
+
 
 // Track a click and redirect
 exports.trackClick = async (req, res, next) => {
@@ -307,16 +311,18 @@ exports.getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user.id;
 
-    // Fetch all links for the user and populate clicks
-    const links = await Link.find({ userId }).select("clicks");
+    // 1. Fetch all links for the user, selecting only what you need to display:
+    //    e.g. _id, shortUrl, remarks, etc.
+    const userLinks = await Link.find({ userId })
+  .select("_id shortUrl clicks");
 
-    // Aggregate all clicks across all links
-    const allClicks = links.reduce((acc, link) => {
+    // 2. Aggregate all clicks across these links
+    const allClicks = [];
+    for (const link of userLinks) {
       if (link.clicks && link.clicks.length > 0) {
-        acc.push(...link.clicks);
+        allClicks.push(...link.clicks);
       }
-      return acc;
-    }, []);
+    }
 
     // Total Clicks
     const totalClicks = allClicks.length;
@@ -329,14 +335,10 @@ exports.getDashboardStats = async (req, res, next) => {
         month: "2-digit",
         day: "2-digit",
       });
-      if (dateWiseClicks[date]) {
-        dateWiseClicks[date]++;
-      } else {
-        dateWiseClicks[date] = 1;
-      }
+      dateWiseClicks[date] = (dateWiseClicks[date] || 0) + 1;
     });
 
-    // Convert dateWiseClicks to an array and sort by date descending
+    // Sort date-wise clicks in descending order of date
     const sortedDateWiseClicks = Object.keys(dateWiseClicks)
       .map((date) => ({ date, count: dateWiseClicks[date] }))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -355,12 +357,14 @@ exports.getDashboardStats = async (req, res, next) => {
       else deviceWiseClicks.Other++;
     });
 
-    res.json({
+    // 3. Return everything, including the userLinks array
+    return res.json({
       success: true,
       data: {
         totalClicks,
         dateWiseClicks: sortedDateWiseClicks,
         deviceWiseClicks,
+        links: userLinks, // <-- Now your frontend can map over `dashboardStats.links`
       },
     });
   } catch (err) {

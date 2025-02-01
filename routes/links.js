@@ -7,28 +7,17 @@ const authenticateToken = require("../middlewares/authMiddleware");
 // Apply authentication middleware to all routes in this router
 router.use(authenticateToken);
 
-// **New Route for Dashboard Statistics**
+// =========== Dashboard & Analytics ===========
 router.get("/dashboard/stats", linkController.getDashboardStats);
+router.get("/all-clicks", linkController.getAllClicks);        // e.g., for entire dataset
+router.get("/analytics/:id", linkController.getLinkAnalytics); // e.g., analytics for one link
 
-// **New Analytics Route**
-router.get("/analytics", linkController.getAllClicks);
-
-// POST route to create a new link
+// =========== CRUD Operations on Links ===========
 router.post("/", linkController.createLink);
-
-// GET route to fetch links with pagination and search
 router.get("/", linkController.getLinks);
-
-// Route to get link analytics
-router.get("/analytics/:id", linkController.getLinkAnalytics);
-
-// GET route to fetch link details
 router.get("/:id", linkController.getLinkDetails);
-
-// PUT route to edit a link
 router.put("/:id", linkController.editLink);
-
-// DELETE route to delete a link
 router.delete("/:id", linkController.deleteLink);
+
 
 module.exports = router;
