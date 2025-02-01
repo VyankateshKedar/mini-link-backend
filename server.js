@@ -28,7 +28,7 @@ mongoose
 app.use(express.json());
 
 // CORS Configuration
-const allowedOrigins = ["http://localhost:3000"]; // Add any other allowed origins as needed
+const allowedOrigins = ["mini-link-frontend-mn8z.vercel.app"]; // Add any other allowed origins as needed
 
 const corsOptions = {
   origin: function (origin, callback) {
