@@ -3,28 +3,49 @@ const jwt = require("jsonwebtoken");
 
 const authenticateToken = (req, res, next) => {
   try {
-    // 1. Check for token in headers
+    // 1. Check if the Authorization header exists
     const authHeader = req.headers.authorization;
     if (!authHeader) {
-      return res.status(401).json({ success: false, message: "No token provided" });
+      return res.status(401).json({
+        success: false,
+        message: "No Authorization header provided",
+      });
     }
 
-    // 2. Parse out "Bearer" part
-    const token = authHeader.split(" ")[1];
+    // 2. Confirm the header starts with "Bearer "
+    //    and split out the token
+    const parts = authHeader.split(" ");
+    if (parts.length !== 2 || parts[0] !== "Bearer") {
+      return res
+        .status(401)
+        .json({ success: false, message: "Token malformed (missing 'Bearer')" });
+    }
+
+    // 3. Extract the token
+    const token = parts[1];
     if (!token) {
-      return res.status(401).json({ success: false, message: "Token malformed" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Token not provided after 'Bearer'" });
     }
 
-    // 3. Verify JWT
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // decoded might look like: { id: "<someObjectId>", iat: 1234, exp: 1234 }
+    // Optional: Log the token to debug what is being received
+    console.log("Received token:", token);
 
-    // 4. Attach user info to req
+    // 4. Verify the JWT
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 5. Attach user info to the req object (for use in subsequent handlers)
     req.user = { id: decoded.id };
-    next(); // Continue to the next middleware or route handler
+
+    // 6. Proceed to next middleware
+    next();
   } catch (err) {
     console.error("JWT Error:", err);
-    return res.status(401).json({ success: false, message: "Invalid or expired token" });
+    // Typically, jwt.verify throws an error if the token is invalid or expired
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired token" });
   }
 };
 
